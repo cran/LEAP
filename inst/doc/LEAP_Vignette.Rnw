@@ -1,0 +1,238 @@
+\documentclass[letterpaper]{article}
+
+% \VignetteIndexEntry{LEAP_Vignette}
+% \VignetteEngine{Sweave}
+% \VignetteDepends{ggplot2}
+
+\usepackage[margin=0.75in]{geometry}
+
+\title{LEAP: Constructing gene-coexpression networks for single-cell sequencing data using pseudo-time ordering}
+\author{Alicia T. Specht and Jun Li}
+
+\begin{document}
+
+\SweaveOpts{concordance=TRUE}
+\maketitle
+
+%-----------------------------------------------------------------------
+
+\vspace{10mm}
+
+\section*{Abstract}
+
+\textbf{Summary:} To construct gene co-expression networks based on single-cell RNA-Sequencing data, we present an algorithm called LEAP, which utilizes the estimated pseudo-time information of the cells to find stronger associations between pairs of genes.\\
+\textbf{Contact:} aspecht2@nd.edu
+
+%-----------------------------------------------------------------------
+
+\vspace{10mm}
+
+\tableofcontents
+
+% \section*{Contents}
+
+% \begin{description}
+%   \item[ Introduction..................................................................................................1]
+%   \item[ Data format...................................................................................................2]
+%   \item[ Maximum Absolute Correlation (MAC) Counter Function..........................2]
+%   \item[ Permutation Analysis Function.....................................................................3]
+%   \item[ Plotting lags versus correlation.....................................................................4]
+%   \item[ Session Information.......................................................................................5]
+%   \item[ Citation Information.....................................................................................6]
+%   \item[ References.....................................................................................................6]
+% \end{description}
+
+
+\vspace{10mm}
+
+%-----------------------------------------------------------------------
+
+\section{Introduction}
+
+Advances in sequencing technology now allow researchers to capture the expression profiles of individual cells. Several algorithms have been developed to attempt to account for these effects by determining a cell's so-called `pseudo-time', or relative biological state of transition.
+
+By applying these algorithms to single-cell sequencing data, we can sort cells into their pseudotemporal ordering based on gene expression. LEAP (Lag-based Expression Association for Pseudotime-series) then applies a time-series inspired lag-based correlation analysis to reveal linearly dependent genetic associations.
+
+\newpage
+%-----------------------------------------------------------------------
+
+\section{Data format}
+
+LEAP takes a data matrix for which the rows are genes and the columns are experiments, sorted by their pseudo-time. For example, consider this dataset consisting 20 genes from a dataset of high throughput single-cell RNA sequencing counts of \textit{Mus musculus} dendritic cells(Shalek \textit{et al}, 2014):
+
+
+%21
+<<>>=
+library("LEAP")
+example_data[,1:5]
+@
+
+\noindent
+We've shown only the first 5 cells here. The column names are the pseudo-times that were generated for each sample using Monocle (Trapnell \textit{et al.}, 2014). As you can see, the samples have been ordered from lowest to greatest pseudo-time. We've also applied a log(x+1) transformation to the count data.
+
+\vspace{10mm}
+
+%-----------------------------------------------------------------------
+
+\section{Maximum Absolute Correlation (MAC) Counter Function}
+
+Once your data is in the above format, you can use the \texttt{MAC}\texttt{\_counter()} function to calculate the Max Absolute Correlation (MAC) matrix for you data. The output of this function is a matrix where \texttt{Row gene index} and \texttt{Column gene index} correspond to the indeces for the gene pair (i,j), \texttt{Correlation} is the maximum absolute correlation (MAC) achieved for the pair, and \texttt{Lag} is the lag at which the MAC occurred. Note that the pair (i,j) and (j,i) will both appear in the results, as they will potentially have different MACs. As can be seen below, setting \texttt{MAC}\texttt{\_cutoff=0.2} restricts the output to only those pairs with an MAC of 0.2 or greater.
+
+%2
+<<>>=
+MAC_results = MAC_counter(data=example_data, max_lag_prop=1/3, MAC_cutoff=0.2, file_name="example", lag_matrix=T)
+
+MAC_results[41:71,]
+@
+
+\noindent
+Here, \texttt{max}\texttt{\_lag}\texttt{\_ prop} is the largest proportion of your experiments that you want your lag to be. For this example, we have 564 experiments, so the largest lag we will try is 188. We recommend using at most a \texttt{max}\texttt{\_lag}\texttt{\_prop=1/3}. The variable \texttt{file}\texttt{\_name} is the name you'd to associate with your files. Our example creates the file \texttt{MAC}\texttt{\_example.csv}.
+
+%3
+<<>>=
+MAC_example[1:5,1:5]
+@
+
+The variable \texttt{lag}\texttt{\_matrix} decides whether you would like the associated matrix of lag values to be saved as well. For our example, setting \texttt{lag}\texttt{\_matrix=T} creates the file \texttt{lag}\texttt{\_example.csv}.
+
+%4
+<<>>=
+lag_example[1:5,1:5]
+@
+
+\noindent
+Again, note that the diagonal is set to \texttt{NA}. It is important to note that each of the values in the lag matrix correspond to the size of the lag used on the gene listed in the column. In our example, 172 corresponds to starting gene 1's expression at its first pseudo-time point and staggering the expression of gene 2 by 172 pseudo-time points (hence starting at 173).
+
+
+%-----------------------------------------------------------------------
+
+\section{Permutation Analysis Function}
+
+To determine a cutoff for significant MAC values, you can use the \texttt{MAC}\texttt{\_perm()} function.
+
+%5
+<<>>=
+MAC_perm(data=example_data, MACs_observ=MAC_example, num_perms=10, max_lag_prop=1/3,
+         FDR_cutoffs=101, perm_file_name="example")
+@
+
+
+The variable \texttt{num}\texttt{\_perms} determines the number of permutations to use. Note we've only used 10 here to simplify our example. For larger datasets, using 100 is most likely appropriate. \texttt{FDR}\texttt{\_cutoffs} determines the number of cutoffs you'd like to use to split the domain [0,1] for the correlation. \texttt{data}, \texttt{max}\texttt{\_lag}\texttt{\_prop} and \texttt{perm}\texttt{\_file}\texttt{\_name} follow the same use as described for \texttt{MAC}\texttt{\_counter()}.
+
+This returns the dataset below, where \texttt{cors} are the correlation cutoffs, \texttt{MACs}\texttt{\_observed} are the number of observed correlations at that cutoff, \texttt{MACs}\texttt{\_ave}\texttt{\_perm} are the average number observed in the permuted datasets at that cutoff, and \texttt{fdr} is the false discovery rate (FDR) observed at that cutoff. We can see that for our example dataset, if we would like to control the FDR around 0.1, then a correlation cutoff of 0.18 would be appropriate. Below are shown the results with nonzero FDR:
+
+%6
+<<>>=
+perm_example[74:101,]
+@
+
+\newpage
+
+%-----------------------------------------------------------------------
+
+\section{Plotting lags versus correlation}
+
+It may be of interest view the distribution of lags at various correlation cutoffs. This is easy to do with the output from the \texttt{MAC}\texttt{\_counter()}. First we must convert the numerical values lag matrix \texttt{lag}\texttt{\_example} into categorical variables based on whatever cutoffs we'd like to designate. First, lets pull out all of the non-\texttt{NA} values from both of our matrices:
+
+%7
+<<>>=
+cors=c()
+lag = c()
+for (i in(1:20)){
+
+  cors = c(cors, na.omit(MAC_example[,i]))
+  lag = c(lag, na.omit(lag_example[,i]))
+}
+@
+
+We then convert the lag values into categorical cutoffs. Keeping with our paper:
+
+%8
+<<>>=
+lag_bin=c()
+for(i in (1:380)){
+  if(lag[i]==0){lag_bin[i]="0"
+  }else if(lag[i]>0 & lag[i]<=10){lag_bin[i]="1-10"
+  }else if(lag[i]>10 & lag[i]<=20){lag_bin[i]="11-20"
+  }else if(lag[i]>20 & lag[i]<=30){lag_bin[i]="21-30"
+  }else if(lag[i]>30 & lag[i]<=40){lag_bin[i]="31-40"
+  }else if(lag[i]>40 & lag[i]<=50){lag_bin[i]="41-50"
+  }else if(lag[i]>50 & lag[i]<=75){lag_bin[i]="51-75"
+  }else if(lag[i]>75 & lag[i]<=100){lag_bin[i]="76-100"
+  }else if(lag[i]>100 & lag[i]<=125){lag_bin[i]="101-125"
+  }else if(lag[i]>125 & lag[i]<=150){lag_bin[i]="126-150"
+  }else if(lag[i]>151 & lag[i]<=175){lag_bin[i]="151-175"
+  }else{lag_bin[i]=">175"}
+}
+@
+
+We then need to combine our correlation values and lag bins to create a data frame that \texttt{ggplot2} can use:
+
+%9
+<<>>=
+data = as.data.frame(cbind(cors,lag,lag_bin))
+data$cors = as.numeric(as.character(data$cors))
+data$lag_bin = factor(lag_bin, levels =c(">175", "151-175", "126-150", "101-125", "76-100", "51-75", "41-50", "31-40",
+                                         "21-30", "11-20", "1-10", "0"))
+@
+
+Finally, we can plot a histrogram of our results:
+
+%10
+<<fig=TRUE>>=
+library(ggplot2)
+ggplot(data = data, aes(data$cors)) + geom_histogram(binwidth = 0.05, aes(fill = lag_bin)) + scale_y_sqrt() +xlab("Correlation") +ylab("Square Root Counts")+guides(fill=guide_legend(title="Lag")) + ggtitle("Histogram of Correlations")
+@
+
+\vspace{10mm}
+
+%-----------------------------------------------------------------------
+
+\section{Generating matrices for use in WGCNA}
+
+If you intend to use the results from LEAP for further analysis with WGCNA (Langfelder and Horvath, 2008), then you will require a symmetric matrix of correlations. LEAP will compute this matrix by setting \texttt{symmetric=T}. This creates two files, \texttt{lag}\texttt{\_symmetric}\texttt{\_example.csv} and \texttt{MAC}\texttt{\_symmetric}\texttt{\_example.csv}. LEAP finds this matrix by comparing the correlation of each (i,j) and (j,i) pair, and keeping the value with the maximum absolute correlation. In our example, the pair gene 1 and gene 2 have correlation -0.17 when gene 2 is the lagged gene, (1,2), and correlation 0.14 when gene 1 is the lagged gene, (2,1), then in the symmetric matrix (1,2)=(2,1) = -0.17. Below are the results when we find the symmetric matrix for our example dataset:
+
+%11
+<<>>=
+output=MAC_counter(data=example_data, max_lag_prop=1/3, file_name="example", lag_matrix=T, symmetric=T)
+@
+
+%12
+<<>>=
+MAC_symmetric[1:5,1:5]
+@
+
+%-----------------------------------------------------------------------
+
+\section{Session information}
+
+%13
+<<>>=
+sessionInfo()
+@
+
+%-----------------------------------------------------------------------
+
+
+
+\section{Citation information}
+
+
+%-----------------------------------------------------------------------
+
+\begin{thebibliography}{}
+
+\bibitem[Langfelder and Horvath, 2008]{WGCNA08}
+Langfelder, Peter and Horvath, Steve (2008) WGCNA: an R package for weighted correlation network analysis. \textit{BMC bioinformatics}, \textbf{9(1)}, 1.
+
+
+\bibitem[Shalek \textit{et~al}., 2014]{Shalek14}
+Shalek AK, Satija R., Shuga J., Trombetta J.J. et al. (2014) Single-cell RNA-seq reveals dynamic paracrine control of cellular variation. \textit{Nature}, \textbf{510(7505)}, 363-369.
+
+
+\bibitem[Trapnell {\it et~al}., 2014]{Trapnell14}
+Trapnell, Cole and Cacchiarelli, Davide and Grimsby, Jonna and Pokharel, Prapti and Li, Shuqiang and Morse, Michael and Lennon, Niall J. and Livak, Kenneth J. and Mikkelsen, Tarjei S. and Rinn, John L. (2014) The dynamics and regulators of cell fate decisions are revealed by pseudotemporal ordering of single cells, {\it Nature Biotechnology}, {\bf 32(4)}, 381-386.
+
+\end{thebibliography}
+
+\end{document}
