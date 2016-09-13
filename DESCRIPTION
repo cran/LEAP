@@ -2,8 +2,8 @@ Package: LEAP
 Type: Package
 Title: Constructing Gene Co-Expression Networks for Single-Cell
         RNA-Sequencing Data Using Pseudotime Ordering
-Version: 0.1
-Date: 2016-05-12
+Version: 0.2
+Date: 2016-09-09
 Author: Alicia T. Specht and Jun Li
 Maintainer: Alicia T. Specht <aspecht2@nd.edu>
 Suggests: ggplot2
@@ -11,6 +11,6 @@ Description: Advances in sequencing technology now allow researchers to capture 
 License: GPL-2
 LazyData: yes
 NeedsCompilation: no
-Packaged: 2016-05-15 13:08:46 UTC; aspecht2
+Packaged: 2016-09-13 13:06:15 UTC; aspecht2
 Repository: CRAN
-Date/Publication: 2016-05-15 22:01:52
+Date/Publication: 2016-09-13 21:19:05

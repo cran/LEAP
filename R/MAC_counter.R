@@ -1,7 +1,7 @@
 MAC_counter <-
 function(data, max_lag_prop=1/3, MAC_cutoff=0.2, file_name=F, lag_matrix=T, symmetric=F){
   
-  results=MAC_lags(data, max_lag_prop=1/3, symmetric=F)
+  results=MAC_lags(data, max_lag_prop=max_lag_prop, symmetric=F)
   
   results_MACs=results[,1:nrow(data)]
   results_lags=results[,-(1:nrow(data))]
@@ -40,8 +40,8 @@ function(data, max_lag_prop=1/3, MAC_cutoff=0.2, file_name=F, lag_matrix=T, symm
   max_cors = cors[which(cors>=MAC_cutoff)]
   unique_cors = unique(max_cors)
   
-  ind_cor = which(abs(results_MACs)>=0.2)
-  ind_rc = which(abs(results_MACs)>=0.2, arr.ind=T)
+  ind_cor = which(abs(results_MACs)>=MAC_cutoff)
+  ind_rc = which(abs(results_MACs)>=MAC_cutoff, arr.ind=T)
   
   data_inds=cbind(abs(results_MACs[ind_cor]),results_MACs[ind_cor], results_lags[ind_cor],ind_rc[,1], ind_rc[,2])
   
